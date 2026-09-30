@@ -184,83 +184,250 @@ const questions = [
 const questionElement = document.getElementById("question");
 const answerButton = document.getElementById("answer-buttons");
 const nextButton = document.getElementById("next-btn");
+const prevButton = document.getElementById("prev-btn");
+const gridButtons = document.querySelectorAll(".grid-btn");
 
 let currentQuestionIndex = 0;
 let score = 0;
 
+// Stores the answer selected for each question.
+// null means the question has not been answered yet.
+let userAnswers = new Array(questions.length).fill(null);
+
+
 function startQuiz() {
     currentQuestionIndex = 0;
     score = 0;
+    userAnswers = new Array(questions.length).fill(null);
+
     nextButton.innerHTML = "Next";
+
+    // Reset all grid buttons
+    gridButtons.forEach(button => {
+        button.classList.remove("correct", "incorrect");
+    });
+
     showQuestion();
-};
+}
+
 
 function showQuestion() {
     resetState();
-    let currentQuestion = questions[currentQuestionIndex];
-    let questionNo = currentQuestionIndex + 1;
-    questionElement.innerHTML = questionNo + ". " + currentQuestion.question;
 
-    currentQuestion.answers.forEach(answer => {
+    const currentQuestion = questions[currentQuestionIndex];
+    const questionNo = currentQuestionIndex + 1;
+
+    questionElement.innerHTML =
+        questionNo + ". " + currentQuestion.question;
+
+    currentQuestion.answers.forEach((answer, answerIndex) => {
         const button = document.createElement("button");
+
         button.innerHTML = answer.text;
         button.classList.add("btn");
+
         answerButton.appendChild(button);
-        if(answer.correct){
-            button.dataset.correct = answer.correct;
-        };
+
+        if (answer.correct) {
+            button.dataset.correct = "true";
+        }
 
         button.addEventListener("click", selectAnswer);
     });
-};
+
+
+    // If this question has already been answered,
+    // restore its previous answer and result.
+    if (userAnswers[currentQuestionIndex] !== null) {
+        const selectedAnswerIndex = userAnswers[currentQuestionIndex];
+
+        const buttons = answerButton.children;
+        const selectedButton = buttons[selectedAnswerIndex];
+
+        if (questions[currentQuestionIndex].answers[selectedAnswerIndex].correct) {
+            selectedButton.classList.add("correct");
+        } else {
+            selectedButton.classList.add("incorrect");
+        }
+
+        // Show the correct answer
+        Array.from(buttons).forEach(button => {
+            if (button.dataset.correct === "true") {
+                button.classList.add("correct");
+            }
+
+            button.disabled = true;
+        });
+
+        nextButton.style.display = "inline-block";
+    }
+
+    // Previous is available whenever we're not on question 1.
+    if (currentQuestionIndex > 0) {
+        prevButton.style.display = "inline-block";
+    }
+
+    // Update the grid button for the current question.
+    updateGridButton(currentQuestionIndex);
+}
+
 
 function resetState() {
     nextButton.style.display = "none";
-    while(answerButton.firstChild){
+    prevButton.style.display = "none";
+
+    while (answerButton.firstChild) {
         answerButton.removeChild(answerButton.firstChild);
-    };
-};
+    }
+}
+
 
 function selectAnswer(e) {
     const selectedBtn = e.target;
-    const isCorrect = selectedBtn.dataset.correct === "true";
-    if(isCorrect){
+
+    // Find which answer button was selected.
+    const selectedAnswerIndex =
+        Array.from(answerButton.children).indexOf(selectedBtn);
+
+    const isCorrect =
+        questions[currentQuestionIndex].answers[selectedAnswerIndex].correct;
+
+
+    // Save the user's answer for this question.
+    userAnswers[currentQuestionIndex] = selectedAnswerIndex;
+
+
+    if (isCorrect) {
         selectedBtn.classList.add("correct");
-        score++;
     } else {
         selectedBtn.classList.add("incorrect");
-    };
+    }
+
+
+    // Show the correct answer and disable all answers.
     Array.from(answerButton.children).forEach(button => {
-        if(button.dataset.correct === "true"){
+        if (button.dataset.correct === "true") {
             button.classList.add("correct");
-        };
+        }
+
         button.disabled = true;
     });
-    nextButton.style.display = "block";
-};
+
+
+    // Update the corresponding grid button.
+    updateGridButton(currentQuestionIndex);
+
+
+    nextButton.style.display = "inline-block";
+
+    if (currentQuestionIndex > 0) {
+        prevButton.style.display = "inline-block";
+    }
+}
+
+
+function updateGridButton(index) {
+    const gridButton = gridButtons[index];
+
+    if (!gridButton) {
+        return;
+    }
+
+    // Remove any previous result class.
+    gridButton.classList.remove("correct", "incorrect");
+
+
+    // If the question hasn't been answered, leave it unchanged.
+    if (userAnswers[index] === null) {
+        return;
+    }
+
+
+    const selectedAnswerIndex = userAnswers[index];
+
+    const isCorrect =
+        questions[index].answers[selectedAnswerIndex].correct;
+
+
+    if (isCorrect) {
+        gridButton.classList.add("correct");
+    } else {
+        gridButton.classList.add("incorrect");
+    }
+}
+
+
+function calculateScore() {
+    score = 0;
+
+    userAnswers.forEach((selectedAnswerIndex, questionIndex) => {
+        // Ignore unanswered questions.
+        if (selectedAnswerIndex === null) {
+            return;
+        }
+
+        if (questions[questionIndex].answers[selectedAnswerIndex].correct) {
+            score++;
+        }
+    });
+
+    return score;
+}
+
 
 function showScore() {
+    calculateScore();
+
     resetState();
-    questionElement.innerHTML = `You scored ${score} out of ${questions.length}!`;
+
+    questionElement.innerHTML =
+        `You scored ${score} out of ${questions.length}!`;
+
     nextButton.innerHTML = "Play Again";
     nextButton.style.display = "block";
-};
+}
+
 
 function handleNextButton() {
     currentQuestionIndex++;
-    if(currentQuestionIndex < questions.length){
+
+    if (currentQuestionIndex < questions.length) {
         showQuestion();
     } else {
         showScore();
-    };
-};
+    }
+}
 
+
+function handlePrevButton() {
+    if (currentQuestionIndex > 0) {
+        currentQuestionIndex--;
+        showQuestion();
+    }
+}
+
+
+// NEXT BUTTON
 nextButton.addEventListener("click", () => {
-    if(currentQuestionIndex < questions.length){
+    if (currentQuestionIndex < questions.length) {
         handleNextButton();
     } else {
         startQuiz();
-    };
+    }
 });
+
+
+// PREVIOUS BUTTON
+prevButton.addEventListener("click", handlePrevButton);
+
+
+// GRID BUTTONS
+gridButtons.forEach((button, index) => {
+    button.addEventListener("click", () => {
+        currentQuestionIndex = index;
+        showQuestion();
+    });
+});
+
 
 startQuiz();
